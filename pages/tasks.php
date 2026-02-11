@@ -9,7 +9,7 @@ require_once __DIR__ . '/../includes/sidebar.php';
 
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h4 class="mb-0">All Tasks</h4>
-  <a href="/pages/task-create.php" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle me-1"></i>Create</a>
+  <a href="<?= BASE_URL ?>pages/task-create.php" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle me-1"></i>Create</a>
 </div>
 
 <div class="card shadow-sm">

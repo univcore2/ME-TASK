@@ -11,7 +11,7 @@ $taskId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h4 class="mb-0">Task #<?= $taskId ?></h4>
-  <a href="/pages/tasks.php" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
+  <a href="<?= BASE_URL ?>pages/tasks.php" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
 </div>
 
 <div class="row g-3">
