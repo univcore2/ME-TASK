@@ -63,7 +63,7 @@ require_once __DIR__ . '/../includes/sidebar.php';
       <div class="card shadow-sm widget-card">
         <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
           <span><i class="bi bi-alarm me-1"></i>Reminders</span>
-          <a class="btn btn-outline-secondary btn-sm" href="/pages/reminders.php">View</a>
+          <a class="btn btn-outline-secondary btn-sm" href="<?= BASE_URL ?>pages/reminders.php">View</a>
         </div>
         <div class="card-body p-2" id="reminderWidget">
           <div class="text-muted small">Upcoming reminders will show here.</div>
