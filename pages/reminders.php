@@ -128,7 +128,17 @@ require_once __DIR__ . '/../includes/sidebar.php';
   const visFilterEl = document.getElementById("remVisibility");
 
   const modalEl = document.getElementById("reminderModal");
-  const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+  let modal = null;
+
+  function getModal(){
+    if (!modal) {
+      if (!window.bootstrap || !bootstrap.Modal) {
+        throw new Error("Bootstrap modal is not available");
+      }
+      modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+    }
+    return modal;
+  }
 
   const form = document.getElementById("reminderForm");
   const msg = document.getElementById("remFormMsg");
@@ -248,7 +258,12 @@ require_once __DIR__ . '/../includes/sidebar.php';
     setDefaultDateTime();
     remRepeat.value = "none";
     remVis.value = "personal";
-    modal.show();
+    try {
+      getModal().show();
+    } catch (err) {
+      console.error(err);
+      alert('Unable to open reminder modal. Please refresh and try again.');
+    }
   });
 
   btnRefresh.addEventListener("click", loadReminders);
@@ -283,7 +298,12 @@ require_once __DIR__ . '/../includes/sidebar.php';
       remDate.value = parts[0] || '';
       remTime.value = (parts[1] || '').substring(0,5) || '';
 
-      modal.show();
+      try {
+        getModal().show();
+      } catch (err) {
+        console.error(err);
+        alert('Unable to open reminder modal. Please refresh and try again.');
+      }
     }
 
     if (action === "toggle"){
@@ -327,7 +347,13 @@ require_once __DIR__ . '/../includes/sidebar.php';
     msg.innerHTML = `<div class="alert alert-success py-2">${esc(data.message || 'Saved')}</div>`;
     loadReminders();
 
-    setTimeout(() => modal.hide(), 600);
+    setTimeout(() => {
+      try {
+        getModal().hide();
+      } catch (err) {
+        console.error(err);
+      }
+    }, 600);
   });
 
   loadReminders();
