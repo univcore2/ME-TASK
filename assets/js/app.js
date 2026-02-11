@@ -50,16 +50,71 @@ document.addEventListener("DOMContentLoaded", () => {
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
 
-  // Quick Note Save (Dashboard)
-  const saveNoteBtn = document.getElementById("saveNoteBtn");
-  if (saveNoteBtn) {
-    saveNoteBtn.addEventListener("click", async () => {
-      const status = document.getElementById("noteStatus");
-      status.textContent = "Saving...";
+  const NOTES_KEY = 'me_task_manager_notes';
 
-      setTimeout(() => {
-        status.textContent = "Saved ✓";
-      }, 400);
+  // Notes (Dashboard + Notes Page)
+  const quickNote = document.getElementById('quickNote');
+  const noteStatus = document.getElementById('noteStatus');
+  const saveNoteBtn = document.getElementById('saveNoteBtn');
+
+  const notesPageText = document.getElementById('notesPageText');
+  const notesPageStatus = document.getElementById('notesPageStatus');
+  const notesPageSaveBtn = document.getElementById('notesPageSaveBtn');
+
+  const loadSavedNotes = () => {
+    try {
+      const saved = localStorage.getItem(NOTES_KEY) || '';
+      if (quickNote) quickNote.value = saved;
+      if (notesPageText) notesPageText.value = saved;
+      if (noteStatus) noteStatus.textContent = saved ? 'Saved ✓' : 'Not saved';
+      if (notesPageStatus) notesPageStatus.textContent = saved ? 'Saved ✓' : 'Not saved';
+    } catch (error) {
+      console.error('Unable to read notes:', error);
+    }
+  };
+
+  const saveNotes = () => {
+    try {
+      const text = quickNote ? quickNote.value : (notesPageText ? notesPageText.value : '');
+      localStorage.setItem(NOTES_KEY, text);
+      if (quickNote && notesPageText) {
+        quickNote.value = text;
+        notesPageText.value = text;
+      }
+      if (noteStatus) noteStatus.textContent = 'Saved ✓';
+      if (notesPageStatus) notesPageStatus.textContent = 'Saved ✓';
+    } catch (error) {
+      console.error('Unable to save notes:', error);
+      if (noteStatus) noteStatus.textContent = 'Save failed';
+      if (notesPageStatus) notesPageStatus.textContent = 'Save failed';
+    }
+  };
+
+  loadSavedNotes();
+
+  if (saveNoteBtn) {
+    saveNoteBtn.addEventListener('click', () => {
+      if (noteStatus) noteStatus.textContent = 'Saving...';
+      saveNotes();
+    });
+  }
+
+  if (notesPageSaveBtn) {
+    notesPageSaveBtn.addEventListener('click', () => {
+      if (notesPageStatus) notesPageStatus.textContent = 'Saving...';
+      saveNotes();
+    });
+  }
+
+  if (quickNote) {
+    quickNote.addEventListener('input', () => {
+      if (noteStatus) noteStatus.textContent = 'Not saved';
+    });
+  }
+
+  if (notesPageText) {
+    notesPageText.addEventListener('input', () => {
+      if (notesPageStatus) notesPageStatus.textContent = 'Not saved';
     });
   }
 
@@ -161,6 +216,107 @@ document.addEventListener("DOMContentLoaded", () => {
         searchTimer = window.setTimeout(loadTasks, 250);
       });
     }
+  }
+
+  // Dashboard widgets
+  const pendingList = document.getElementById('pendingList');
+  const progressList = document.getElementById('progressList');
+  const completedList = document.getElementById('completedList');
+  const reminderWidget = document.getElementById('reminderWidget');
+  const workloadSummary = document.getElementById('workloadSummary');
+
+  if (pendingList && progressList && completedList) {
+    const renderTaskCards = (targetEl, tasks) => {
+      if (!tasks.length) {
+        targetEl.innerHTML = '<div class="text-muted small">No tasks.</div>';
+        return;
+      }
+
+      targetEl.innerHTML = tasks.slice(0, 8).map((task) => {
+        const deadline = task.deadline ? `<div class="small text-muted"><i class="bi bi-calendar-event me-1"></i>${escapeHtml(task.deadline)}</div>` : '';
+        const taskId = Number(task.id || 0);
+
+        return `
+          <div class="border rounded p-2 mb-2">
+            <div class="fw-semibold small">${escapeHtml(task.title || '-')}</div>
+            <div class="small text-muted">${escapeHtml(task.assigned_name || 'Unassigned')}</div>
+            ${deadline}
+            ${taskId > 0 ? `<a class="small" href="task-view.php?id=${taskId}">Open</a>` : ''}
+          </div>
+        `;
+      }).join('');
+    };
+
+    const renderWorkload = (tasks) => {
+      if (!workloadSummary) return;
+      if (!tasks.length) {
+        workloadSummary.innerHTML = '<div class="text-muted small">No workload data.</div>';
+        return;
+      }
+
+      const counts = {};
+      tasks.forEach((task) => {
+        const name = task.assigned_name || 'Unassigned';
+        counts[name] = (counts[name] || 0) + 1;
+      });
+
+      const rows = Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8)
+        .map(([name, count]) => `<div class="d-flex justify-content-between small"><span>${escapeHtml(name)}</span><span class="fw-semibold">${count}</span></div>`)
+        .join('');
+
+      workloadSummary.innerHTML = rows;
+    };
+
+    const loadDashboardTasks = async () => {
+      try {
+        const data = await fetchJsonWithFallback('api/tasks/list.php?status=all');
+        if (!data.ok || !Array.isArray(data.tasks)) throw new Error(data.message || 'Failed to load tasks');
+
+        const tasks = data.tasks;
+        renderTaskCards(pendingList, tasks.filter((task) => (task.status || 'pending') === 'pending'));
+        renderTaskCards(progressList, tasks.filter((task) => (task.status || '') === 'in_progress'));
+        renderTaskCards(completedList, tasks.filter((task) => (task.status || '') === 'completed'));
+        renderWorkload(tasks);
+      } catch (error) {
+        console.error(error);
+        pendingList.innerHTML = '<div class="text-danger small">Unable to load tasks.</div>';
+        progressList.innerHTML = '<div class="text-danger small">Unable to load tasks.</div>';
+        completedList.innerHTML = '<div class="text-danger small">Unable to load tasks.</div>';
+        if (workloadSummary) workloadSummary.innerHTML = '<div class="text-danger small">Unable to load summary.</div>';
+      }
+    };
+
+    loadDashboardTasks();
+  }
+
+  if (reminderWidget) {
+    const loadReminderWidget = async () => {
+      reminderWidget.innerHTML = '<div class="text-muted small">Loading reminders...</div>';
+
+      try {
+        const data = await fetchJsonWithFallback('api/reminders/list.php?done=0&visibility=all');
+        if (!data.ok || !Array.isArray(data.reminders)) throw new Error(data.message || 'Failed to load reminders');
+
+        if (!data.reminders.length) {
+          reminderWidget.innerHTML = '<div class="text-muted small">No upcoming reminders.</div>';
+          return;
+        }
+
+        reminderWidget.innerHTML = data.reminders.slice(0, 5).map((reminder) => `
+          <div class="border rounded p-2 mb-2">
+            <div class="fw-semibold small">${escapeHtml(reminder.title || '-')}</div>
+            <div class="small text-muted">${escapeHtml(reminder.remind_datetime_display || '')}</div>
+          </div>
+        `).join('');
+      } catch (error) {
+        console.error(error);
+        reminderWidget.innerHTML = '<div class="text-danger small">Unable to load reminders.</div>';
+      }
+    };
+
+    loadReminderWidget();
   }
 
   // Progress slider (Task View)

@@ -8,7 +8,7 @@ header('Content-Type: application/json');
 
 $q = trim($_GET['q'] ?? '');
 $done = $_GET['done'] ?? '0'; // 0 pending default
-$visibility = $_GET['visibility'] ?? 'all';
+$visibility = $_GET['visibility'] ?? 'mixed';
 
 $userId = (int)($_SESSION['user_id'] ?? 0);
 
@@ -26,6 +26,10 @@ if ($visibility === 'personal') {
 } elseif ($visibility === 'team') {
   $sql .= " AND visibility='team'";
 } elseif ($visibility === 'all') {
+  // Backward-compatibility: UI 'all' means all visibility buckets.
+  $sql .= " AND ( (visibility='personal' AND created_by=?) OR visibility IN ('team','all') )";
+  $params[] = $userId; $types .= "i";
+} elseif ($visibility === 'everyone') {
   $sql .= " AND visibility='all'";
 } else {
   // all filter -> show: own personal + team + all
