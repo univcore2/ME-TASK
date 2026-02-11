@@ -83,10 +83,45 @@ try {
 
   $sql = 'SELECT ' . implode(', ', $select) . " FROM tasks t" . $join . " WHERE t.$idCol = ? LIMIT 1";
   $stmt = $conn->prepare($sql);
+  if (!$stmt) {
+    throw new RuntimeException('Failed to prepare task detail query.');
+  }
+
   $stmt->bind_param('i', $taskId);
-  $stmt->execute();
-  $result = $stmt->get_result();
-  $task = $result->fetch_assoc();
+  if (!$stmt->execute()) {
+    throw new RuntimeException('Failed to execute task detail query.');
+  }
+
+  $stmt->bind_result(
+    $id,
+    $title,
+    $description,
+    $status,
+    $progress,
+    $deadline,
+    $createdAt,
+    $updatedAt,
+    $assignedTo,
+    $assignedName
+  );
+
+  $task = null;
+  if ($stmt->fetch()) {
+    $task = [
+      'id' => $id,
+      'title' => $title,
+      'description' => $description,
+      'status' => $status,
+      'progress' => $progress,
+      'deadline' => $deadline,
+      'created_at' => $createdAt,
+      'updated_at' => $updatedAt,
+      'assigned_to' => $assignedTo,
+      'assigned_name' => $assignedName,
+    ];
+  }
+
+  $stmt->close();
 
   if (!$task) {
     echo json_encode(['ok' => false, 'message' => 'Task not found.']);
