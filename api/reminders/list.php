@@ -12,58 +12,77 @@ $visibility = $_GET['visibility'] ?? 'mixed';
 
 $userId = (int)($_SESSION['user_id'] ?? 0);
 
-$sql = "SELECT id, title, details, remind_datetime, repeat_type, visibility, created_by, is_done
-        FROM reminders WHERE 1=1";
-$params = [];
-$types = "";
+try {
+  $tableCheck = $conn->query("SHOW TABLES LIKE 'reminders'");
+  if (!$tableCheck || $tableCheck->num_rows === 0) {
+    echo json_encode(['ok' => true, 'reminders' => []]);
+    exit;
+  }
 
-// Visibility rules:
-// - personal: show only own reminders
-// - team/all: show to all users
-if ($visibility === 'personal') {
-  $sql .= " AND visibility='personal' AND created_by=?";
-  $params[] = $userId; $types .= "i";
-} elseif ($visibility === 'team') {
-  $sql .= " AND visibility='team'";
-} elseif ($visibility === 'all') {
-  // Backward-compatibility: UI 'all' means all visibility buckets.
-  $sql .= " AND ( (visibility='personal' AND created_by=?) OR visibility IN ('team','all') )";
-  $params[] = $userId; $types .= "i";
-} elseif ($visibility === 'everyone') {
-  $sql .= " AND visibility='all'";
-} else {
-  // all filter -> show: own personal + team + all
-  $sql .= " AND ( (visibility='personal' AND created_by=?) OR visibility IN ('team','all') )";
-  $params[] = $userId; $types .= "i";
+  $sql = "SELECT id, title, details, remind_datetime, repeat_type, visibility, created_by, is_done
+          FROM reminders WHERE 1=1";
+  $params = [];
+  $types = "";
+
+  // Visibility rules:
+  // - personal: show only own reminders
+  // - team/all: show to all users
+  if ($visibility === 'personal') {
+    $sql .= " AND visibility='personal' AND created_by=?";
+    $params[] = $userId;
+    $types .= 'i';
+  } elseif ($visibility === 'team') {
+    $sql .= " AND visibility='team'";
+  } elseif ($visibility === 'all') {
+    // Backward-compatibility: UI 'all' means all visibility buckets.
+    $sql .= " AND ((visibility='personal' AND created_by=?) OR visibility IN ('team','all'))";
+    $params[] = $userId;
+    $types .= 'i';
+  } elseif ($visibility === 'everyone') {
+    $sql .= " AND visibility='all'";
+  } else {
+    // all filter -> show: own personal + team + all
+    $sql .= " AND ((visibility='personal' AND created_by=?) OR visibility IN ('team','all'))";
+    $params[] = $userId;
+    $types .= 'i';
+  }
+
+  if ($q !== '') {
+    $sql .= ' AND title LIKE ?';
+    $params[] = "%$q%";
+    $types .= 's';
+  }
+
+  if ($done !== 'all') {
+    $sql .= ' AND is_done=?';
+    $params[] = (int)$done;
+    $types .= 'i';
+  }
+
+  $sql .= ' ORDER BY remind_datetime ASC LIMIT 200';
+
+  $stmt = $conn->prepare($sql);
+  if (!empty($params)) {
+    $stmt->bind_param($types, ...$params);
+  }
+  $stmt->execute();
+  $result = $stmt->get_result();
+
+  $rows = [];
+  $now = time();
+
+  while ($r = $result->fetch_assoc()) {
+    $ts = strtotime($r['remind_datetime']);
+    $r['is_overdue'] = ($ts !== false && $ts < $now) ? 1 : 0;
+    $r['remind_datetime_display'] = $r['remind_datetime'];
+    $rows[] = $r;
+  }
+
+  echo json_encode(['ok' => true, 'reminders' => $rows]);
+} catch (Throwable $e) {
+  http_response_code(500);
+  echo json_encode([
+    'ok' => false,
+    'message' => 'Unable to load reminders right now.'
+  ]);
 }
-
-if ($q !== '') {
-  $sql .= " AND title LIKE ?";
-  $params[] = "%$q%";
-  $types .= "s";
-}
-
-if ($done !== 'all') {
-  $sql .= " AND is_done=?";
-  $params[] = (int)$done;
-  $types .= "i";
-}
-
-$sql .= " ORDER BY remind_datetime ASC LIMIT 200";
-
-$stmt = $conn->prepare($sql);
-if (!empty($params)) $stmt->bind_param($types, ...$params);
-$stmt->execute();
-$result = $stmt->get_result();
-
-$rows = [];
-$now = time();
-
-while ($r = $result->fetch_assoc()) {
-  $ts = strtotime($r['remind_datetime']);
-  $r['is_overdue'] = ($ts !== false && $ts < $now) ? 1 : 0;
-  $r['remind_datetime_display'] = $r['remind_datetime']; // keep simple (we can format later)
-  $rows[] = $r;
-}
-
-echo json_encode(['ok'=>true,'reminders'=>$rows]);

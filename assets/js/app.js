@@ -322,6 +322,108 @@ document.addEventListener("DOMContentLoaded", () => {
   // Progress slider (Task View)
   const progressRange = document.getElementById("progressRange");
   const progressValue = document.getElementById("progressValue");
+
+  const taskDetail = document.getElementById('taskDetail');
+  const taskTimeline = document.getElementById('taskTimeline');
+  const statusSelect = document.getElementById('statusSelect');
+  const saveProgressBtn = document.getElementById('saveProgressBtn');
+  const taskUpdateMsg = document.getElementById('taskUpdateMsg');
+
+  if (taskDetail && taskTimeline && progressRange && progressValue && statusSelect && saveProgressBtn && typeof window.ME_TASK_ID !== 'undefined') {
+    const taskId = Number(window.ME_TASK_ID || 0);
+
+    const renderTaskDetail = (task) => {
+      const progress = Number(task.progress || 0);
+      const safeProgress = Number.isFinite(progress) ? Math.max(0, Math.min(100, progress)) : 0;
+      const status = String(task.status || 'pending');
+
+      taskDetail.innerHTML = `
+        <h5 class="mb-1">${escapeHtml(task.title || '-')}</h5>
+        <div class="small text-muted mb-3">Assigned to: ${escapeHtml(task.assigned_name || 'Unassigned')}</div>
+        <p class="mb-3">${escapeHtml(task.description || 'No description provided.')}</p>
+
+        <div class="row g-2 small">
+          <div class="col-12 col-md-6"><span class="text-muted">Deadline:</span> ${escapeHtml(task.deadline || '-')}</div>
+          <div class="col-12 col-md-6"><span class="text-muted">Status:</span> ${escapeHtml(status.replace('_', ' '))}</div>
+          <div class="col-12 col-md-6"><span class="text-muted">Progress:</span> ${safeProgress}%</div>
+          <div class="col-12 col-md-6"><span class="text-muted">Last update:</span> ${escapeHtml(task.updated_at || task.created_at || '-')}</div>
+        </div>
+      `;
+
+      progressRange.value = String(safeProgress);
+      progressValue.textContent = `${safeProgress}%`;
+      statusSelect.value = ['pending', 'in_progress', 'completed'].includes(status) ? status : 'pending';
+    };
+
+    const renderTimeline = (task) => {
+      taskTimeline.innerHTML = `
+        <div class="small border-start ps-3 mb-2">
+          <div class="fw-semibold">Task created</div>
+          <div class="text-muted">${escapeHtml(task.created_at || '-')}</div>
+        </div>
+        <div class="small border-start ps-3">
+          <div class="fw-semibold">Latest status: ${escapeHtml(String(task.status || 'pending').replace('_', ' '))}</div>
+          <div class="text-muted">Progress ${escapeHtml(String(task.progress || 0))}% • ${escapeHtml(task.updated_at || task.created_at || '-')}</div>
+        </div>
+      `;
+    };
+
+    const loadTaskDetails = async () => {
+      if (taskId <= 0) {
+        taskDetail.innerHTML = '<div class="text-danger">Invalid task id.</div>';
+        taskTimeline.innerHTML = '<div class="text-muted">No timeline available.</div>';
+        return;
+      }
+
+      try {
+        const data = await fetchJsonWithFallback(`api/tasks/get.php?id=${taskId}`);
+        if (!data.ok || !data.task) {
+          taskDetail.innerHTML = `<div class="text-danger">${escapeHtml(data.message || 'Unable to load task.')}</div>`;
+          taskTimeline.innerHTML = '<div class="text-muted">No timeline available.</div>';
+          return;
+        }
+
+        renderTaskDetail(data.task);
+        renderTimeline(data.task);
+      } catch (error) {
+        console.error(error);
+        taskDetail.innerHTML = '<div class="text-danger">Error loading task details.</div>';
+        taskTimeline.innerHTML = '<div class="text-muted">No timeline available.</div>';
+      }
+    };
+
+    saveProgressBtn.addEventListener('click', async () => {
+      if (taskUpdateMsg) taskUpdateMsg.innerHTML = '<div class="text-muted small">Saving...</div>';
+
+      try {
+        const formBody = new URLSearchParams({
+          id: String(taskId),
+          status: statusSelect.value,
+          progress: String(progressRange.value)
+        });
+
+        const data = await fetchJsonWithFallback('api/tasks/update_progress.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: formBody
+        });
+
+        if (!data.ok) {
+          if (taskUpdateMsg) taskUpdateMsg.innerHTML = `<div class="alert alert-danger py-2">${escapeHtml(data.message || 'Update failed.')}</div>`;
+          return;
+        }
+
+        if (taskUpdateMsg) taskUpdateMsg.innerHTML = `<div class="alert alert-success py-2">${escapeHtml(data.message || 'Task updated.')}</div>`;
+        loadTaskDetails();
+      } catch (error) {
+        console.error(error);
+        if (taskUpdateMsg) taskUpdateMsg.innerHTML = '<div class="alert alert-danger py-2">Error saving task update.</div>';
+      }
+    });
+
+    loadTaskDetails();
+  }
+
   if (progressRange && progressValue) {
     progressRange.addEventListener("input", () => {
       progressValue.textContent = `${progressRange.value}%`;
