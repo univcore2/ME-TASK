@@ -119,12 +119,33 @@ try {
   }
 
   $stmt->execute();
-  $res = $stmt->get_result();
+
+  $stmt->bind_result(
+    $id,
+    $title,
+    $description,
+    $taskStatus,
+    $progress,
+    $deadline,
+    $assignedTo,
+    $assignedName
+  );
 
   $tasks = [];
-  while ($row = $res->fetch_assoc()) {
-    $tasks[] = $row;
+  while ($stmt->fetch()) {
+    $tasks[] = [
+      'id' => $id,
+      'title' => $title,
+      'description' => $description,
+      'status' => $taskStatus,
+      'progress' => $progress,
+      'deadline' => $deadline,
+      'assigned_to' => $assignedTo,
+      'assigned_name' => $assignedName,
+    ];
   }
+
+  $stmt->close();
 
   echo json_encode(['ok' => true, 'tasks' => $tasks]);
 } catch (Throwable $e) {
