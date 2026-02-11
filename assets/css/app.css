@@ -1,0 +1,14 @@
+/* assets/css/app.css */
+.widget-box {
+  position: sticky;
+  top: 1rem;
+}
+
+.widget-card {
+  height: 12.5vh; /* ~1/8 of screen height */
+  overflow: auto;
+}
+
+.task-col {
+  min-height: 70vh;
+}
