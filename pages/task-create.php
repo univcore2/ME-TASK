@@ -68,12 +68,50 @@ require_once __DIR__ . '/../includes/sidebar.php';
 <script>
 document.addEventListener("DOMContentLoaded", function () {
 
+  const buildCandidates = (path) => {
+    const base = "<?= BASE_URL ?>";
+    const cleanedPath = path.replace(/^\/+/, '');
+
+    return [
+      `${base}${cleanedPath}`,
+      `../${cleanedPath}`,
+      `/${cleanedPath}`
+    ];
+  };
+
+  const fetchJsonWithFallback = async (path, options = {}) => {
+    const candidates = buildCandidates(path);
+    let lastError = null;
+
+    for (const candidate of candidates) {
+      try {
+        const response = await fetch(candidate, {
+          credentials: "same-origin",
+          ...options
+        });
+
+        if (response.status === 404) {
+          continue;
+        }
+
+        const contentType = response.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) {
+          const body = await response.text();
+          throw new Error(`Expected JSON but got ${contentType || 'unknown content type'} (${response.status}). Body starts with: ${body.slice(0, 80)}`);
+        }
+
+        return await response.json();
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError || new Error("Request failed for all known URL paths.");
+  };
+
   // 1) Load users for dropdown
   const select = document.getElementById("assignedToSelect");
-  const url = "<?= BASE_URL ?>api/users/list_simple.php";
-
-  fetch(url, { credentials: "same-origin" })
-    .then(r => r.json())
+  fetchJsonWithFallback("api/users/list_simple.php")
     .then(data => {
       if (!data.ok) {
         select.innerHTML = '<option value="">Failed to load users</option>';
@@ -104,14 +142,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     try{
       const fd = new FormData(form);
-
-      const res = await fetch("<?= BASE_URL ?>api/tasks/create.php", {
+      const data = await fetchJsonWithFallback("api/tasks/create.php", {
         method: "POST",
-        body: fd,
-        credentials: "same-origin"
+        body: fd
       });
-
-      const data = await res.json();
 
       if(!data.ok){
         msgBox.innerHTML = `<div class="alert alert-danger py-2">${data.message || 'Failed to create task'}</div>`;
