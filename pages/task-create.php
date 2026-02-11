@@ -79,11 +79,13 @@ document.addEventListener("DOMContentLoaded", function () {
     ];
   };
 
-  const fetchJsonWithFallback = async (path, options = {}) => {
+  const fetchJsonWithFallback = async (path, options = {}, fallbackOptions = {}) => {
+    const { allowFallback = true } = fallbackOptions;
     const candidates = buildCandidates(path);
+    const requestCandidates = allowFallback ? candidates : candidates.slice(0, 1);
     let lastError = null;
 
-    for (const candidate of candidates) {
+    for (const candidate of requestCandidates) {
       try {
         const response = await fetch(candidate, {
           credentials: "same-origin",
@@ -145,6 +147,8 @@ document.addEventListener("DOMContentLoaded", function () {
       const data = await fetchJsonWithFallback("api/tasks/create.php", {
         method: "POST",
         body: fd
+      }, {
+        allowFallback: false
       });
 
       if(!data.ok){
