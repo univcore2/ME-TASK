@@ -227,18 +227,23 @@ require_once __DIR__ . '/../includes/sidebar.php';
       visibility: normalizeVisFilter(visFilterEl.value)
     });
 
-    const data = await fetchJSON(BASE + "api/reminders/list.php?" + params.toString());
-    if (!data.ok){
-      listEl.innerHTML = `<div class="text-danger">${esc(data.message || 'Failed')}</div>`;
-      return;
-    }
+    try {
+      const data = await fetchJSON(BASE + "api/reminders/list.php?" + params.toString());
+      if (!data.ok){
+        listEl.innerHTML = `<div class="text-danger">${esc(data.message || 'Failed')}</div>`;
+        return;
+      }
 
-    if (!data.reminders.length){
-      listEl.innerHTML = `<div class="text-muted">No reminders found.</div>`;
-      return;
-    }
+      if (!data.reminders.length){
+        listEl.innerHTML = `<div class="text-muted">No reminders found.</div>`;
+        return;
+      }
 
-    listEl.innerHTML = data.reminders.map(buildItem).join('');
+      listEl.innerHTML = data.reminders.map(buildItem).join('');
+    } catch (err) {
+      console.error(err);
+      listEl.innerHTML = `<div class="text-danger">Unable to load reminders.</div>`;
+    }
   }
 
   function setDefaultDateTime(){
